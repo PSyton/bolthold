@@ -7,7 +7,7 @@ package bolthold_test
 import (
 	"testing"
 
-	bh "github.com/timshannon/bolthold"
+	bh "github.com/psyton/bolthold"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -43,17 +43,17 @@ func TestIndexSlice(t *testing.T) {
 		b := store.Bolt()
 
 		ok(t, b.View(func(tx *bolt.Tx) error {
-			bucket := tx.Bucket([]byte("_index:ItemTest:Tags"))
+			bucket := tx.Bucket([]byte("_index_v2:ItemTest:Tags"))
 			assert(t, bucket != nil, "No index bucket found for Tags index")
 
 			indexCount := 0
-			bucket.ForEach(func(k, v []byte) error {
+			_ = bucket.ForEach(func(k, v []byte) error {
 				indexCount++
 				return nil
 			})
 
-			// each tag chould be indexed individually and there are 5 different tags
-			equals(t, indexCount, 5)
+			// 4 - red, 2 - purple, 1 — orange, 1 - blue, 1 - green
+			equals(t, indexCount, 9)
 			return nil
 		}))
 

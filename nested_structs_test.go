@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/timshannon/bolthold"
-	bh "github.com/timshannon/bolthold"
+	"github.com/psyton/bolthold"
+	bh "github.com/psyton/bolthold"
 	bolt "go.etcd.io/bbolt"
 )
 

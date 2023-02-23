@@ -14,7 +14,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/timshannon/bolthold"
+	"github.com/psyton/bolthold"
 	bolt "go.etcd.io/bbolt"
 )
 
@@ -38,7 +38,7 @@ func TestBolt(t *testing.T) {
 
 // copy from index.go
 func indexName(typeName, indexName string) []byte {
-	return []byte("_index" + ":" + typeName + ":" + indexName)
+	return []byte("_index_v2" + ":" + typeName + ":" + indexName)
 }
 
 func TestRemoveIndex(t *testing.T) {

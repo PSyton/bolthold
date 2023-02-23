@@ -73,6 +73,32 @@ func (s *Store) insert(source BucketSource, key, data interface{}) error {
 		}
 	}
 
+	dataVal := reflect.Indirect(reflect.ValueOf(data))
+	if dataVal.CanSet() {
+		dataType := dataVal.Type()
+
+		for i := 0; i < dataType.NumField(); i++ {
+			tf := dataType.Field(i)
+			// XXX: should we require standard tag format so we can use StructTag.Lookup()?
+			// XXX: should we use strings.Contains(string(tf.Tag), BoltholdKeyTag) so we don't require proper tags?
+			if _, ok := tf.Tag.Lookup(BoltholdKeyTag); ok {
+				fieldValue := dataVal.Field(i)
+				keyValue := reflect.ValueOf(key)
+				if keyValue.Type() != tf.Type {
+					break
+				}
+				if !fieldValue.CanSet() {
+					break
+				}
+				if !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(tf.Type).Interface()) {
+					break
+				}
+				fieldValue.Set(keyValue)
+				break
+			}
+		}
+	}
+
 	gk, err := s.encode(key)
 
 	if err != nil {
@@ -100,34 +126,6 @@ func (s *Store) insert(source BucketSource, key, data interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	dataVal := reflect.Indirect(reflect.ValueOf(data))
-	if !dataVal.CanSet() {
-		return nil
-	}
-	dataType := dataVal.Type()
-
-	for i := 0; i < dataType.NumField(); i++ {
-		tf := dataType.Field(i)
-		// XXX: should we require standard tag format so we can use StructTag.Lookup()?
-		// XXX: should we use strings.Contains(string(tf.Tag), BoltholdKeyTag) so we don't require proper tags?
-		if _, ok := tf.Tag.Lookup(BoltholdKeyTag); ok {
-			fieldValue := dataVal.Field(i)
-			keyValue := reflect.ValueOf(key)
-			if keyValue.Type() != tf.Type {
-				break
-			}
-			if !fieldValue.CanSet() {
-				break
-			}
-			if !reflect.DeepEqual(fieldValue.Interface(), reflect.Zero(tf.Type).Interface()) {
-				break
-			}
-			fieldValue.Set(keyValue)
-			break
-		}
-	}
-
 	return nil
 }
 

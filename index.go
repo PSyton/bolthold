@@ -22,7 +22,8 @@ const BoltholdUniqueTag = "boltholdUnique"
 // slice is indexed separately rather than as one index
 const BoltholdSliceIndexTag = "boltholdSliceIndex"
 
-const indexBucketPrefix = "_index"
+const indexLegacyBucketPrefix = "_index"
+const indexBucketPrefix = "_index_v2"
 
 // size of iterator keys stored in memory before more are fetched
 const iteratorKeyMinCacheSize = 100
@@ -33,7 +34,7 @@ type Index struct {
 	Unique    bool
 }
 
-// SliceIndex is a function that returns all of the indexable values in a slice
+// SliceIndex is a function that returns all indexable values in a slice
 type SliceIndex func(name string, value interface{}) ([][]byte, error)
 
 // adds an item to the index
@@ -87,52 +88,47 @@ func (s *Store) updateIndexes(storer Storer, source BucketSource, key []byte, da
 // adds or removes a specific index on an item
 func (s *Store) updateIndex(typeName, indexName string, unique bool, indexKey []byte, source BucketSource, key []byte,
 	delete bool) error {
-	indexValue := make(keyList, 0)
 
 	b, err := source.CreateBucketIfNotExists(indexBucketName(typeName, indexName))
 	if err != nil {
 		return err
 	}
 
-	iVal := b.Get(indexKey)
-	if iVal != nil {
-		if unique && !delete {
-			return ErrUniqueExists
+	if unique {
+		if !delete {
+			iVal := b.Get(indexKey)
+			if iVal != nil {
+				return ErrUniqueExists
+			}
+			return b.Put(indexKey, key)
 		}
-
-		err = s.decode(iVal, &indexValue)
-		if err != nil {
-			return err
-		}
-
-	}
-
-	if delete {
-		indexValue.remove(key)
-	} else {
-		indexValue.add(key)
-	}
-
-	if len(indexValue) == 0 {
 		return b.Delete(indexKey)
 	}
 
-	iVal, err = s.encode(indexValue)
-	if err != nil {
-		return err
+	indexKey = append(indexKey, key...)
+	if delete {
+		return b.Delete(indexKey)
 	}
-
-	return b.Put(indexKey, iVal)
+	return b.Put(indexKey, key)
 }
 
 // IndexExists tests if an index exists for the passed in field name
 func (s *Store) IndexExists(source BucketSource, typeName, indexName string) bool {
-	return (source.Bucket(indexBucketName(typeName, indexName)) != nil)
+	return source.Bucket(indexBucketName(typeName, indexName)) != nil
+}
+
+// LegacyIndexExists tests if an index exists for the passed in field name
+func (s *Store) legacyIndexExists(source BucketSource, typeName, indexName string) bool {
+	return source.Bucket(legacyIndexBucketName(typeName, indexName)) != nil
 }
 
 // indexBucketName returns the name of the bolt bucket where this index is stored
 func indexBucketName(typeName, indexName string) []byte {
 	return []byte(indexBucketPrefix + ":" + typeName + ":" + indexName)
+}
+
+func legacyIndexBucketName(typeName, indexName string) []byte {
+	return []byte(indexLegacyBucketPrefix + ":" + typeName + ":" + indexName)
 }
 
 // keyList is a slice of unique, sorted keys([]byte) such as what an index points to
@@ -315,20 +311,15 @@ func (s *Store) newIterator(source BucketSource, typeName string, query *Query) 
 			}
 
 			// no currentRow on indexes as it refers to multiple rows
-			ok, err := matchesAllCriteria(s, criteria, k, true, nil)
+			value := k[:len(k)-len(v)]
+			ok, err := matchesAllCriteria(s, criteria, value, true, nil)
 			if err != nil {
 				return nil, err
 			}
 
 			if ok {
 				// append the slice of keys stored in the index
-				var keys = make(keyList, 0)
-				err := s.decode(v, &keys)
-				if err != nil {
-					return nil, err
-				}
-
-				nKeys = append(nKeys, [][]byte(keys)...)
+				nKeys = append(nKeys, v)
 			}
 
 		}

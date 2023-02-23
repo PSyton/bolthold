@@ -5,6 +5,7 @@
 package bolthold
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"reflect"
@@ -70,6 +71,48 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+func (s *Store) DeleteLegacyIndexes(exampleType interface{}, bucketName []byte) (bool, error) {
+	storer := s.newStorer(exampleType)
+
+	deletedCount := 0
+	err := s.Bolt().Update(func(tx *bolt.Tx) error {
+		indexes := storer.Indexes()
+
+		deleteLegacyIndex := func(indexName string) error {
+			if s.legacyIndexExists(tx, storer.Type(), indexName) {
+				err := tx.DeleteBucket(legacyIndexBucketName(storer.Type(), indexName))
+				if err != nil && !errors.Is(err, bolt.ErrBucketNotFound) {
+					return err
+				}
+				if err == nil {
+					deletedCount++
+				}
+			}
+			return nil
+		}
+
+		for indexName := range indexes {
+			if err := deleteLegacyIndex(indexName); err != nil {
+				return err
+			}
+		}
+
+		sliceIndexes := storer.SliceIndexes()
+		for indexName := range sliceIndexes {
+			if err := deleteLegacyIndex(indexName); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	return deletedCount > 0, nil
+}
+
 // ReIndex removes any existing indexes and adds all the indexes defined by the passed in datatype example
 // This function allows you to index an already existing boltDB file, or refresh any missing indexes
 // if bucketName is nil, then we'll assume a bucketName of storer.Type()
@@ -79,6 +122,7 @@ func (s *Store) ReIndex(exampleType interface{}, bucketName []byte) error {
 
 	return s.Bolt().Update(func(tx *bolt.Tx) error {
 		indexes := storer.Indexes()
+
 		// delete existing indexes
 		// TODO: Remove indexes not specified the storer index list?
 		// good for cleanup, bad for possible side effects
@@ -145,7 +189,6 @@ func (s *Store) RemoveIndex(dataType interface{}, indexName string) error {
 	storer := s.newStorer(dataType)
 	return s.Bolt().Update(func(tx *bolt.Tx) error {
 		return tx.DeleteBucket(indexBucketName(storer.Type(), indexName))
-
 	})
 }
 

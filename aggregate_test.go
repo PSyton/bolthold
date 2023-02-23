@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/timshannon/bolthold"
+	"github.com/psyton/bolthold"
 )
 
 func TestFindAggregateGroup(t *testing.T) {
@@ -40,7 +40,7 @@ func TestFindAggregateGroup(t *testing.T) {
 			}
 		}
 
-		//test min / max / count
+		// test min / max / count
 		for i := range result {
 			min := &ItemTest{}
 			max := &ItemTest{}
@@ -152,7 +152,7 @@ func TestFindAggregateMultipleGrouping(t *testing.T) {
 			}
 		}
 
-		//test min / max / count
+		// test min / max / count
 		for i := range result {
 			min := &ItemTest{}
 			max := &ItemTest{}
